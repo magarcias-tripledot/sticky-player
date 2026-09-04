@@ -1,10 +1,11 @@
-import { BALL_DIAMETER, SPACING_TOLERANCE } from "./constants";
+import { BALL_DIAMETER, OVERLAP_EPSILON, SPACING_TOLERANCE } from "./constants";
 import type { StickyBall } from "./types";
 
-// Same formula as StickyLevelValidator: 2 * worldBallRadius + max(0, spacingTolerance).
+// Matches BallsSpawner.IsPositionFree (2 * radius) plus optional authoring margin,
+// then subtracts OVERLAP_EPSILON so serialized-float contact pairs stay valid.
 export function minCenterDistanceFor(spacingTolerance: number): number {
   const tolerance = Number.isFinite(spacingTolerance) ? Math.max(0, spacingTolerance) : 0;
-  return BALL_DIAMETER + tolerance;
+  return BALL_DIAMETER + tolerance - OVERLAP_EPSILON;
 }
 
 function distanceSquared(a: StickyBall, b: StickyBall): number {

@@ -121,8 +121,8 @@ export function Inspector() {
           />
         </label>
         <p className="muted">
-          Minimum distance is {BALL_DIAMETER.toFixed(2)} + tolerance, same as Unity. Use 0 to accept
-          balls packed at exact contact.
+          Default 0 matches gameplay contact packing (diameter {BALL_DIAMETER.toFixed(2)}). Raise
+          this for an extra authoring margin, like Unity&apos;s Spacing Tolerance.
         </p>
       </section>
 

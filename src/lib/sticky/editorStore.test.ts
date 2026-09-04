@@ -66,14 +66,17 @@ describe("editorStore", () => {
     expect(useEditorStore.getState().exportJson()).toBeNull();
   });
 
-  it("exports a level packed at exact contact once tolerance is 0", () => {
+  it("exports a level packed at exact contact by default", () => {
     useEditorStore.getState().importJson(contactJson);
-    expect(useEditorStore.getState().exportJson()).toBeNull();
-
-    useEditorStore.getState().setSpacingTolerance(0);
     const json = useEditorStore.getState().exportJson();
     expect(json).not.toBeNull();
     expect(JSON.parse(json as string).payload.balls).toHaveLength(2);
+  });
+
+  it("blocks export of contact packing when extra authoring margin is requested", () => {
+    useEditorStore.getState().importJson(contactJson);
+    useEditorStore.getState().setSpacingTolerance(0.02);
+    expect(useEditorStore.getState().exportJson()).toBeNull();
   });
 
   it("clamps negative tolerance input to 0", () => {
