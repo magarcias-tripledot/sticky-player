@@ -40,6 +40,8 @@ type EditorState = {
   deleteBall: (id: string) => void;
   updateMetadata: (patch: MetadataPatch) => void;
   applyGeneratedBalls: (generated: GeneratedBall[], mode?: "replace" | "append") => void;
+  newLevel: () => void;
+  clearBalls: () => void;
   undo: () => void;
   redo: () => void;
   exportJson: () => string | null;
@@ -162,6 +164,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       color: ball.color,
     }));
     nextDocument.payload.balls = mode === "append" ? [...nextDocument.payload.balls, ...mapped] : mapped;
+    set((state) => ({
+      ...withHistory(state, nextDocument),
+      selectedId: null,
+      cameraFitNonce: state.cameraFitNonce + 1,
+    }));
+  },
+
+  newLevel: () => {
+    set({
+      document: createEmptyDocument(),
+      selectedId: null,
+      importError: null,
+      past: [],
+      future: [],
+      cameraFitNonce: get().cameraFitNonce + 1,
+    });
+  },
+
+  clearBalls: () => {
+    const { document } = get();
+    if (document.payload.balls.length === 0 && document.payload.ballCount === 0) {
+      return;
+    }
+    const nextDocument = cloneDocument(document);
+    nextDocument.payload.balls = [];
+    nextDocument.payload.ballCount = 0;
     set((state) => ({
       ...withHistory(state, nextDocument),
       selectedId: null,

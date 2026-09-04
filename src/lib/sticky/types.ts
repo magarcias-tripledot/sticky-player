@@ -55,13 +55,13 @@ export function createEmptyDocument(): StickyLevelDocument {
     payload: {
       format: "placements",
       balls: [],
-      ballCount: 0,
+      ballCount: 50,
       rotationSpeed: 12,
       boosters: {
-        bomb: 0,
-        multiball: 0,
-        wild: 0,
-        rainbow: 0,
+        bomb: 10,
+        multiball: 10,
+        wild: 10,
+        rainbow: 10,
       },
       seed: 1,
     },

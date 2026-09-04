@@ -98,4 +98,76 @@ describe("editorStore", () => {
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().document.payload.balls).toHaveLength(2);
   });
+
+  it("newLevel restores default id/name, empty balls, and wipes undo", () => {
+    useEditorStore.getState().importJson(validJson);
+    useEditorStore.getState().setBallColor(useEditorStore.getState().document.payload.balls[0].id, "C");
+    useEditorStore.getState().newLevel();
+    const { document, past, future, selectedId } = useEditorStore.getState();
+    expect(document.id).toBe("untitled-level");
+    expect(document.name).toBe("Untitled Level");
+    expect(document.payload.balls).toHaveLength(0);
+    expect(document.payload.ballCount).toBe(50);
+    expect(document.payload.rotationSpeed).toBe(12);
+    expect(document.payload.boosters).toEqual({
+      bomb: 10,
+      multiball: 10,
+      wild: 10,
+      rainbow: 10,
+    });
+    expect(past).toHaveLength(0);
+    expect(future).toHaveLength(0);
+    expect(selectedId).toBeNull();
+  });
+
+  it("clearBalls empties balls, zeros ballCount, and keeps identity metadata", () => {
+    useEditorStore.getState().importJson(validJson);
+    useEditorStore.getState().clearBalls();
+    const { document } = useEditorStore.getState();
+    expect(document.id).toBe("ok");
+    expect(document.name).toBe("Ok");
+    expect(document.payload.balls).toHaveLength(0);
+    expect(document.payload.ballCount).toBe(0);
+    expect(document.payload.boosters.bomb).toBe(0);
+    expect(document.payload.rotationSpeed).toBe(12);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().document.payload.balls).toHaveLength(2);
+    expect(useEditorStore.getState().document.payload.ballCount).toBe(4);
+  });
+
+  it("clearBalls zeros ballCount even when there are no balls", () => {
+    useEditorStore.setState({
+      document: {
+        ...createEmptyDocument(),
+        id: "kept-id",
+        name: "Kept Name",
+        payload: {
+          ...createEmptyDocument().payload,
+          balls: [],
+          ballCount: 9,
+        },
+      },
+      past: [],
+      future: [],
+    });
+    useEditorStore.getState().clearBalls();
+    expect(useEditorStore.getState().document.id).toBe("kept-id");
+    expect(useEditorStore.getState().document.payload.ballCount).toBe(0);
+    expect(useEditorStore.getState().document.payload.balls).toHaveLength(0);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().document.payload.ballCount).toBe(9);
+  });
+
+  it("clearBalls is a no-op when balls and ballCount are already empty", () => {
+    useEditorStore.setState({
+      document: {
+        ...createEmptyDocument(),
+        payload: { ...createEmptyDocument().payload, balls: [], ballCount: 0 },
+      },
+      past: [],
+      future: [],
+    });
+    useEditorStore.getState().clearBalls();
+    expect(useEditorStore.getState().past).toHaveLength(0);
+  });
 });

@@ -24,6 +24,8 @@ export function Inspector() {
   const undo = useEditorStore((state) => state.undo);
   const redo = useEditorStore((state) => state.redo);
   const exportJson = useEditorStore((state) => state.exportJson);
+  const newLevel = useEditorStore((state) => state.newLevel);
+  const clearBalls = useEditorStore((state) => state.clearBalls);
   const spacingTolerance = useEditorStore((state) => state.spacingTolerance);
   const setSpacingTolerance = useEditorStore((state) => state.setSpacingTolerance);
 
@@ -64,6 +66,30 @@ export function Inspector() {
     URL.revokeObjectURL(url);
   }
 
+  const canClear = document.payload.balls.length > 0 || document.payload.ballCount > 0;
+  const newLevelNeedsConfirm = document.payload.balls.length > 0 || pastLength > 0;
+
+  function onNewLevel() {
+    if (newLevelNeedsConfirm && !window.confirm("Create a new untitled level? Unsaved edits and undo history will be discarded.")) {
+      return;
+    }
+    newLevel();
+  }
+
+  function onClear() {
+    if (!canClear) {
+      return;
+    }
+    if (
+      !window.confirm(
+        "Clear all balls and reset shot count (ballCount) to 0? Level id, name, and boosters are kept. This can be undone.",
+      )
+    ) {
+      return;
+    }
+    clearBalls();
+  }
+
   return (
     <aside className="inspector">
       <header className="inspector-header">
@@ -75,6 +101,14 @@ export function Inspector() {
       </header>
 
       <section className="panel">
+        <div className="row">
+          <button type="button" onClick={onNewLevel}>
+            New Level
+          </button>
+          <button type="button" className="danger" onClick={onClear} disabled={!canClear}>
+            Clear
+          </button>
+        </div>
         <div className="row">
           <button type="button" onClick={() => fileInputRef.current?.click()}>
             Import JSON
