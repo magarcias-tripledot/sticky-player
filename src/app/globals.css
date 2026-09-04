@@ -1,0 +1,143 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #0e1014;
+  color: #e8eaef;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  height: 100vh;
+  min-height: 100vh;
+}
+
+.viewport-pane,
+.viewport-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.inspector {
+  overflow: auto;
+  border-left: 1px solid #2a2f3a;
+  background: #171a21;
+  padding: 16px;
+}
+
+.inspector-header h1 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.inspector-header p,
+.muted,
+.ok {
+  margin: 0;
+  color: #9aa3b5;
+  font-size: 12px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.panel h2 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #b7c0d0;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  flex: 1;
+  border: 1px solid #3a4150;
+  background: #232833;
+  color: #e8eaef;
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.danger {
+  background: #4a1f24;
+  border-color: #7a3038;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #9aa3b5;
+}
+
+input {
+  border: 1px solid #3a4150;
+  background: #10131a;
+  color: #e8eaef;
+  border-radius: 6px;
+  padding: 7px 8px;
+}
+
+.xyz {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.swatch {
+  min-height: 32px;
+  font-weight: 700;
+  color: #111;
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+}
+
+.swatch.selected {
+  outline: 2px solid #ffffff;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.error {
+  margin: 0;
+  color: #ff6b6b;
+  font-size: 12px;
+}
+
+.ok {
+  color: #6dce86;
+}

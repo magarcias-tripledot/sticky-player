@@ -1,0 +1,29 @@
+{
+  "id": "sample-sticky-level",
+  "order": 1,
+  "name": "Sample Sticky Level",
+  "sceneKey": "Sticky",
+  "payload": {
+    "format": "placements",
+    "balls": [
+      { "position": { "x": -1.05, "y": 0.3, "z": -0.35 }, "color": "R" },
+      { "position": { "x": -0.35, "y": 0.3, "z": -0.35 }, "color": "O" },
+      { "position": { "x": 0.35, "y": 0.3, "z": -0.35 }, "color": "Y" },
+      { "position": { "x": 1.05, "y": 0.3, "z": -0.35 }, "color": "G" },
+      { "position": { "x": -1.05, "y": 0.3, "z": 0.35 }, "color": "B" },
+      { "position": { "x": -0.35, "y": 0.3, "z": 0.35 }, "color": "P" },
+      { "position": { "x": 0.35, "y": 0.3, "z": 0.35 }, "color": "K" },
+      { "position": { "x": 1.05, "y": 0.3, "z": 0.35 }, "color": "C" },
+      { "position": { "x": -0.7, "y": 0.95, "z": 0 }, "color": "R" }
+    ],
+    "ballCount": 12,
+    "rotationSpeed": 12,
+    "boosters": {
+      "bomb": 2,
+      "multiball": 1,
+      "wild": 1,
+      "rainbow": 0
+    },
+    "seed": 101
+  }
+}

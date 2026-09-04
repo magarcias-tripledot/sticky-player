@@ -1,0 +1,22 @@
+{
+  "id": "overlapping-sample",
+  "order": 2,
+  "name": "Overlapping Sample",
+  "sceneKey": "Sticky",
+  "payload": {
+    "format": "placements",
+    "balls": [
+      { "position": { "x": 0, "y": 0.3, "z": 0 }, "color": "R" },
+      { "position": { "x": 0.3, "y": 0.3, "z": 0 }, "color": "B" }
+    ],
+    "ballCount": 5,
+    "rotationSpeed": 12,
+    "boosters": {
+      "bomb": 0,
+      "multiball": 0,
+      "wild": 0,
+      "rainbow": 0
+    },
+    "seed": 2
+  }
+}
