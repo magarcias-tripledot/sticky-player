@@ -2,33 +2,30 @@ import type { StickyColorCode } from "../sticky/colors";
 import {
   cellCenterWorld,
   innerColumnsFor,
-  MAX_LAYERS,
+  normalizeLattice,
   ringRadius,
   slotId,
+  type LatticeSpec,
 } from "./cylindricalLattice";
 import type { GeneratedBall, GeometryGenerator } from "./types";
 
 export const DEFAULT_BOOSTED_COLOR: StickyColorCode = "R";
 
-export type BoostedGridParams = {
-  columns: number;
-  rows: number;
-  layers: number;
+export type BoostedGridParams = LatticeSpec & {
   colorsBySlot?: Record<string, StickyColorCode>;
+  /** When set, keep holes; fill only brand-new slot ids with the default color. */
+  previousSlots?: readonly string[];
 };
 
 export function generateBoostedGrid(params: BoostedGridParams): GeneratedBall[] {
-  const columns = Math.max(3, Math.trunc(Number.isFinite(params.columns) ? params.columns : 3));
-  const rows = Math.max(1, Math.trunc(Number.isFinite(params.rows) ? params.rows : 1));
-  const layerCount = Math.min(
-    MAX_LAYERS,
-    Math.max(1, Math.trunc(Number.isFinite(params.layers) ? params.layers : 1)),
-  );
+  const { columns, rows, layers } = normalizeLattice(params);
   const colors = params.colorsBySlot ?? {};
+  const sparse = params.previousSlots !== undefined;
+  const previous = sparse ? new Set(params.previousSlots) : null;
   const outerRadius = ringRadius(columns);
   const balls: GeneratedBall[] = [];
 
-  for (let layer = 0; layer < layerCount; layer += 1) {
+  for (let layer = 0; layer < layers; layer += 1) {
     const layerColumns = innerColumnsFor(columns, layer);
     if (layerColumns === null) {
       continue;
@@ -36,10 +33,14 @@ export function generateBoostedGrid(params: BoostedGridParams): GeneratedBall[] 
     for (let row = 0; row < rows; row += 1) {
       for (let column = 0; column < layerColumns; column += 1) {
         const id = slotId(layer, row, column);
+        const painted = colors[id];
+        if (sparse && painted === undefined && previous?.has(id)) {
+          continue;
+        }
         balls.push({
           id,
           position: cellCenterWorld(layer, row, column, layerColumns, rows, outerRadius),
-          color: colors[id] ?? DEFAULT_BOOSTED_COLOR,
+          color: painted ?? DEFAULT_BOOSTED_COLOR,
         });
       }
     }

@@ -1,0 +1,19 @@
+{
+  "id": "grid-hole",
+  "order": 1,
+  "name": "Grid Hole",
+  "sceneKey": "Sticky",
+  "payload": {
+    "format": "grid",
+    "grid": ["R.R", "RRR"],
+    "ballCount": 8,
+    "rotationSpeed": 12,
+    "boosters": {
+      "bomb": 0,
+      "multiball": 0,
+      "wild": 0,
+      "rainbow": 0
+    },
+    "seed": 3
+  }
+}

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { BALL_DIAMETER, SPACING_TOLERANCE } from "./constants";
 import { createEmptyDocument } from "./types";
 import overlapping from "./fixtures/overlapping.json";
+import gridHole from "./fixtures/grid-hole.json";
 import { useEditorStore } from "@/state/editorStore";
 import { generateBoostedGrid } from "@/lib/generators/boostedGrid";
 import { slotId } from "@/lib/generators/cylindricalLattice";
@@ -53,6 +54,7 @@ describe("editorStore", () => {
       spacingTolerance: SPACING_TOLERANCE,
       past: [],
       future: [],
+      lattice: null,
       generatorSession: null,
     });
   });
@@ -216,7 +218,7 @@ describe("editorStore", () => {
 
   it("starts a generator session with one undo snapshot and rebuilds without growing history", () => {
     const first = generateBoostedGrid({ columns: 6, rows: 1, layers: 1 });
-    useEditorStore.getState().beginGeneratorSession("boosted-grid", first);
+    useEditorStore.getState().beginGeneratorSession("boosted-grid", first, { columns: 6, rows: 1, layers: 1 });
     expect(useEditorStore.getState().past).toHaveLength(1);
     expect(useEditorStore.getState().generatorSession).toBe("boosted-grid");
     const painted = first.map((ball) =>
@@ -229,6 +231,7 @@ describe("editorStore", () => {
         layers: 1,
         colorsBySlot: Object.fromEntries(painted.map((ball) => [ball.id as string, ball.color])),
       }),
+      { columns: 8, rows: 1, layers: 1 },
     );
     expect(useEditorStore.getState().past).toHaveLength(1);
     const balls = useEditorStore.getState().document.payload.balls;
@@ -241,8 +244,13 @@ describe("editorStore", () => {
     useEditorStore.getState().beginGeneratorSession(
       "boosted-grid",
       generateBoostedGrid({ columns: 6, rows: 1, layers: 1 }),
+      { columns: 6, rows: 1, layers: 1 },
     );
-    useEditorStore.getState().rebuildGeneratedBalls(generateBoostedGrid({ columns: 8, rows: 1, layers: 1 }));
+    useEditorStore.getState().rebuildGeneratedBalls(generateBoostedGrid({ columns: 8, rows: 1, layers: 1 }), {
+      columns: 8,
+      rows: 1,
+      layers: 1,
+    });
     useEditorStore.getState().selectBall(slotId(0, 0, 0), false);
     useEditorStore.getState().setSelectedBallsColor("C");
     expect(useEditorStore.getState().document.payload.balls.find((ball) => ball.id === slotId(0, 0, 0))?.color).toBe(
@@ -253,5 +261,88 @@ describe("editorStore", () => {
       "R",
     );
     expect(useEditorStore.getState().document.payload.balls).toHaveLength(8);
+  });
+
+  it("exports a multi-layer grid instead of blocking on shell spacing", () => {
+    useEditorStore.getState().beginGeneratorSession(
+      "boosted-grid",
+      generateBoostedGrid({ columns: 16, rows: 8, layers: 3 }),
+      { columns: 16, rows: 8, layers: 3 },
+    );
+    const json = useEditorStore.getState().exportJson();
+    expect(json).not.toBeNull();
+    const parsed = JSON.parse(json as string);
+    expect(parsed.payload.format).toBe("grid");
+    expect(parsed.payload.grid[0]).toHaveLength(16);
+    expect(parsed.payload.inner[0][0]).toHaveLength(10);
+    expect(parsed.payload.inner[1][0]).toHaveLength(4);
+  });
+
+  it("exports format grid after a boosted-grid generate", () => {
+    useEditorStore.getState().beginGeneratorSession(
+      "boosted-grid",
+      generateBoostedGrid({ columns: 6, rows: 1, layers: 1 }),
+      { columns: 6, rows: 1, layers: 1 },
+    );
+    const parsed = JSON.parse(useEditorStore.getState().exportJson() as string);
+    expect(parsed.payload.format).toBe("grid");
+    expect(parsed.payload.balls).toBeUndefined();
+    expect(parsed.payload.grid).toHaveLength(1);
+    expect(parsed.payload.grid[0]).toHaveLength(6);
+    expect(parsed.payload.inner).toBeUndefined();
+  });
+
+  it("round-trips an imported grid file including holes", () => {
+    useEditorStore.getState().importJson(JSON.stringify(gridHole));
+    expect(useEditorStore.getState().lattice).toEqual({ columns: 3, rows: 2, layers: 1 });
+    const parsed = JSON.parse(useEditorStore.getState().exportJson() as string);
+    expect(parsed.payload.format).toBe("grid");
+    expect(parsed.payload.grid).toEqual(["R.R", "RRR"]);
+  });
+
+  it("keeps placements export for imported placement levels", () => {
+    useEditorStore.getState().importJson(validJson);
+    const parsed = JSON.parse(useEditorStore.getState().exportJson() as string);
+    expect(parsed.payload.format).toBe("placements");
+    expect(parsed.payload.balls).toHaveLength(2);
+  });
+
+  it("writes a hole after deleting a generated slot", () => {
+    useEditorStore.getState().beginGeneratorSession(
+      "boosted-grid",
+      generateBoostedGrid({ columns: 3, rows: 1, layers: 1 }),
+      { columns: 3, rows: 1, layers: 1 },
+    );
+    useEditorStore.getState().selectBall(slotId(0, 0, 1), false);
+    useEditorStore.getState().deleteSelectedBalls();
+    const parsed = JSON.parse(useEditorStore.getState().exportJson() as string);
+    expect(parsed.payload.grid[0]).toBe("R.R");
+  });
+
+  it("falls back to placements when a lattice level has a non-slot ball", () => {
+    useEditorStore.getState().beginGeneratorSession(
+      "boosted-grid",
+      generateBoostedGrid({ columns: 3, rows: 1, layers: 1 }),
+      { columns: 3, rows: 1, layers: 1 },
+    );
+    useEditorStore.getState().applyGeneratedBalls(
+      [{ position: { x: 10, y: 0.3, z: 10 }, color: "B" }],
+      "append",
+    );
+    const parsed = JSON.parse(useEditorStore.getState().exportJson() as string);
+    expect(parsed.payload.format).toBe("placements");
+    expect(parsed.payload.balls).toHaveLength(4);
+  });
+
+  it("clearBalls on a grid level keeps lattice so export stays grid", () => {
+    useEditorStore.getState().beginGeneratorSession(
+      "boosted-grid",
+      generateBoostedGrid({ columns: 3, rows: 1, layers: 1 }),
+      { columns: 3, rows: 1, layers: 1 },
+    );
+    useEditorStore.getState().clearBalls();
+    const parsed = JSON.parse(useEditorStore.getState().exportJson() as string);
+    expect(parsed.payload.format).toBe("grid");
+    expect(parsed.payload.grid[0]).toBe("...");
   });
 });

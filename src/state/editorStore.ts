@@ -1,17 +1,21 @@
 "use client";
 
+import type { LatticeSpec } from "@/lib/generators/cylindricalLattice";
 import type { GeneratedBall } from "@/lib/generators/types";
 import type { StickyColorCode } from "@/lib/sticky/colors";
-import { parseStickyLevel, serializeStickyLevel } from "@/lib/sticky/schema";
+import { parseStickyLevel, serializeExportedLevel } from "@/lib/sticky/schema";
 import { StickyLevelError, createEmptyDocument, type StickyBoosters, type StickyLevelDocument } from "@/lib/sticky/types";
 import { SPACING_TOLERANCE } from "@/lib/sticky/constants";
 import { findInvalidBallIds } from "@/lib/sticky/validateSpacing";
 import { create } from "zustand";
 
 const MAX_HISTORY = 100;
+export const BOOSTED_GRID_SESSION = "boosted-grid";
 
 type Snapshot = {
   document: StickyLevelDocument;
+  lattice: LatticeSpec | null;
+  generatorSession: string | null;
 };
 
 type MetadataPatch = {
@@ -33,17 +37,19 @@ type EditorState = {
   spacingTolerance: number;
   past: Snapshot[];
   future: Snapshot[];
+  lattice: LatticeSpec | null;
+  generatorSession: string | null;
   importJson: (json: string) => void;
   selectBall: (id: string, toggle: boolean) => void;
   clearSelection: () => void;
   setSpacingTolerance: (tolerance: number) => void;
+  setLattice: (lattice: LatticeSpec) => void;
   setSelectedBallsColor: (color: StickyColorCode) => void;
   deleteSelectedBalls: () => void;
   updateMetadata: (patch: MetadataPatch) => void;
   applyGeneratedBalls: (generated: GeneratedBall[], mode?: "replace" | "append") => void;
-  generatorSession: string | null;
-  beginGeneratorSession: (session: string, generated: GeneratedBall[]) => void;
-  rebuildGeneratedBalls: (generated: GeneratedBall[]) => void;
+  beginGeneratorSession: (session: string, generated: GeneratedBall[], lattice: LatticeSpec) => void;
+  rebuildGeneratedBalls: (generated: GeneratedBall[], lattice?: LatticeSpec) => void;
   newLevel: () => void;
   clearBalls: () => void;
   undo: () => void;
@@ -65,14 +71,22 @@ function cloneDocument(document: StickyLevelDocument): StickyLevelDocument {
   };
 }
 
-function snapshotOf(document: StickyLevelDocument): Snapshot {
-  return { document: cloneDocument(document) };
+function cloneLattice(lattice: LatticeSpec | null): LatticeSpec | null {
+  return lattice ? { ...lattice } : null;
+}
+
+function snapshotOf(state: Pick<EditorState, "document" | "lattice" | "generatorSession">): Snapshot {
+  return {
+    document: cloneDocument(state.document),
+    lattice: cloneLattice(state.lattice),
+    generatorSession: state.generatorSession,
+  };
 }
 
 function withHistory(state: EditorState, nextDocument: StickyLevelDocument): Partial<EditorState> {
   return {
     document: nextDocument,
-    past: [...state.past, snapshotOf(state.document)].slice(-MAX_HISTORY),
+    past: [...state.past, snapshotOf(state)].slice(-MAX_HISTORY),
     future: [],
     importError: null,
   };
@@ -99,10 +113,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   past: [],
   future: [],
   generatorSession: null,
+  lattice: null,
 
   importJson: (json) => {
     try {
-      const document = parseStickyLevel(json);
+      const { document, lattice } = parseStickyLevel(json);
       set({
         document,
         selectedIds: [],
@@ -110,7 +125,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         past: [],
         future: [],
         cameraFitNonce: get().cameraFitNonce + 1,
-        generatorSession: null,
+        lattice,
+        generatorSession: lattice ? BOOSTED_GRID_SESSION : null,
       });
     } catch (error) {
       const message = error instanceof StickyLevelError ? error.message : "Level JSON is invalid.";
@@ -139,6 +155,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSpacingTolerance: (tolerance) => {
     const safe = Number.isFinite(tolerance) ? Math.max(0, tolerance) : 0;
     set({ spacingTolerance: safe });
+  },
+
+  setLattice: (lattice) => {
+    set({ lattice: { ...lattice } });
   },
 
   setSelectedBallsColor: (color) => {
@@ -198,10 +218,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ...withHistory(state, nextDocument),
       selectedIds: [],
       cameraFitNonce: state.cameraFitNonce + 1,
+      lattice: mode === "append" ? state.lattice : null,
+      generatorSession: mode === "append" ? state.generatorSession : null,
     }));
   },
 
-  beginGeneratorSession: (session, generated) => {
+  beginGeneratorSession: (session, generated, lattice) => {
     const nextDocument = cloneDocument(get().document);
     nextDocument.payload.balls = mapGeneratedBalls(generated);
     set((state) => ({
@@ -209,10 +231,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedIds: [],
       cameraFitNonce: state.cameraFitNonce + 1,
       generatorSession: session,
+      lattice: { ...lattice },
     }));
   },
 
-  rebuildGeneratedBalls: (generated) => {
+  rebuildGeneratedBalls: (generated, lattice) => {
     const nextDocument = cloneDocument(get().document);
     const mapped = mapGeneratedBalls(generated);
     const nextIds = new Set(mapped.map((ball) => ball.id));
@@ -221,6 +244,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       document: nextDocument,
       selectedIds: state.selectedIds.filter((id) => nextIds.has(id)),
       importError: null,
+      lattice: lattice ? { ...lattice } : state.lattice,
     }));
   },
 
@@ -233,11 +257,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       future: [],
       cameraFitNonce: get().cameraFitNonce + 1,
       generatorSession: null,
+      lattice: null,
     });
   },
 
   clearBalls: () => {
-    const { document } = get();
+    const { document, lattice } = get();
     if (document.payload.balls.length === 0 && document.payload.ballCount === 0) {
       return;
     }
@@ -248,43 +273,47 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ...withHistory(state, nextDocument),
       selectedIds: [],
       cameraFitNonce: state.cameraFitNonce + 1,
-      generatorSession: null,
+      generatorSession: lattice ? state.generatorSession : null,
     }));
   },
 
   undo: () => {
-    const { past, document, future } = get();
+    const { past, future } = get();
     const previous = past[past.length - 1];
     if (!previous) {
       return;
     }
-    set({
+    set((state) => ({
       document: cloneDocument(previous.document),
+      lattice: cloneLattice(previous.lattice),
+      generatorSession: previous.generatorSession,
       selectedIds: [],
       past: past.slice(0, -1),
-      future: [snapshotOf(document), ...future],
-    });
+      future: [snapshotOf(state), ...future],
+    }));
   },
 
   redo: () => {
-    const { future, document, past } = get();
+    const { future, past } = get();
     const next = future[0];
     if (!next) {
       return;
     }
-    set({
+    set((state) => ({
       document: cloneDocument(next.document),
+      lattice: cloneLattice(next.lattice),
+      generatorSession: next.generatorSession,
       selectedIds: [],
-      past: [...past, snapshotOf(document)],
+      past: [...past, snapshotOf(state)],
       future: future.slice(1),
-    });
+    }));
   },
 
   exportJson: () => {
-    const { document, spacingTolerance } = get();
+    const { document, spacingTolerance, lattice } = get();
     if (findInvalidBallIds(document.payload.balls, spacingTolerance).size > 0) {
       return null;
     }
-    return serializeStickyLevel(document);
+    return serializeExportedLevel(document, lattice);
   },
 }));

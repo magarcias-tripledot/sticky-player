@@ -1,5 +1,7 @@
+import { canEncodeAsCylindricalGrid, parseCylindricalGridMaps, serializeStickyGrid } from "../generators/cylindricalGrid";
+import type { LatticeSpec } from "../generators/cylindricalLattice";
 import { isStickyColorCode } from "./colors";
-import { MAX_BOOSTER_CHARGE, PLACEMENT_FORMAT, SCENE_KEY } from "./constants";
+import { GRID_FORMAT, MAX_BOOSTER_CHARGE, PLACEMENT_FORMAT, SCENE_KEY } from "./constants";
 import {
   StickyLevelError,
   type StickyBall,
@@ -9,6 +11,11 @@ import {
 } from "./types";
 
 type UnknownRecord = Record<string, unknown>;
+
+export type ParsedStickyLevel = {
+  document: StickyLevelDocument;
+  lattice: LatticeSpec | null;
+};
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -59,10 +66,54 @@ function parseBoosters(value: unknown): StickyBoosters {
   };
 }
 
+function parseSharedPayload(parsed: UnknownRecord, payload: UnknownRecord) {
+  const ballCount = payload.ballCount;
+  if (typeof ballCount !== "number" || !Number.isFinite(ballCount) || ballCount < 0) {
+    throw new StickyLevelError("ballCount cannot be negative.");
+  }
+
+  const order = readNumber(parsed.order, 0);
+  const seedValue = payload.seed;
+  const seed =
+    typeof seedValue === "number" && Number.isFinite(seedValue)
+      ? Math.trunc(seedValue)
+      : Math.trunc(order);
+
+  return {
+    id: readString(parsed.id),
+    order,
+    name: readString(parsed.name),
+    ballCount: Math.trunc(ballCount),
+    rotationSpeed: readNumber(payload.rotationSpeed, 0),
+    boosters: parseBoosters(payload.boosters),
+    seed,
+  };
+}
+
+function parsePlacementBalls(payload: UnknownRecord, createId: () => string): StickyBall[] {
+  if (!Array.isArray(payload.balls)) {
+    throw new StickyLevelError("Placement level balls are missing.");
+  }
+
+  return payload.balls.map((ball, index) => {
+    if (!isRecord(ball)) {
+      throw new StickyLevelError(`Placement ball ${index} is missing.`);
+    }
+    if (typeof ball.color !== "string" || !isStickyColorCode(ball.color)) {
+      throw new StickyLevelError(`Placement ball ${index} has invalid color '${String(ball.color)}'.`);
+    }
+    return {
+      id: createId(),
+      position: parsePosition(ball.position, index),
+      color: ball.color,
+    };
+  });
+}
+
 export function parseStickyLevel(
   json: string,
   createId: () => string = () => crypto.randomUUID(),
-): StickyLevelDocument {
+): ParsedStickyLevel {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -82,52 +133,53 @@ export function parseStickyLevel(
     throw new StickyLevelError("Level payload is missing.");
   }
 
-  if (parsed.payload.format !== PLACEMENT_FORMAT) {
-    throw new StickyLevelError('Only levels with payload.format "placements" can be opened.');
-  }
+  const shared = parseSharedPayload(parsed, parsed.payload);
 
-  if (!Array.isArray(parsed.payload.balls)) {
-    throw new StickyLevelError("Placement level balls are missing.");
-  }
-
-  const ballCount = parsed.payload.ballCount;
-  if (typeof ballCount !== "number" || !Number.isFinite(ballCount) || ballCount < 0) {
-    throw new StickyLevelError("ballCount cannot be negative.");
-  }
-
-  const order = readNumber(parsed.order, 0);
-  const seedValue = parsed.payload.seed;
-  const seed =
-    typeof seedValue === "number" && Number.isFinite(seedValue)
-      ? Math.trunc(seedValue)
-      : Math.trunc(order);
-
-  const balls: StickyBall[] = parsed.payload.balls.map((ball, index) => {
-    if (!isRecord(ball)) {
-      throw new StickyLevelError(`Placement ball ${index} is missing.`);
-    }
-    if (typeof ball.color !== "string" || !isStickyColorCode(ball.color)) {
-      throw new StickyLevelError(`Placement ball ${index} has invalid color '${String(ball.color)}'.`);
-    }
+  if (parsed.payload.format === PLACEMENT_FORMAT) {
+    const balls = parsePlacementBalls(parsed.payload, createId);
     return {
-      id: createId(),
-      position: parsePosition(ball.position, index),
-      color: ball.color,
+      lattice: null,
+      document: {
+        id: shared.id,
+        order: shared.order,
+        name: shared.name,
+        sceneKey: SCENE_KEY,
+        payload: {
+          format: PLACEMENT_FORMAT,
+          balls,
+          ballCount: shared.ballCount,
+          rotationSpeed: shared.rotationSpeed,
+          boosters: shared.boosters,
+          seed: shared.seed,
+        },
+      },
     };
-  });
+  }
 
+  if (parsed.payload.format === GRID_FORMAT && parsed.payload.grid === undefined) {
+    throw new StickyLevelError("Level grid is missing.");
+  }
+
+  if (!Array.isArray(parsed.payload.grid)) {
+    throw new StickyLevelError('Level must use payload.format "placements" or include a grid.');
+  }
+
+  const { balls, lattice } = parseCylindricalGridMaps(parsed.payload);
   return {
-    id: readString(parsed.id),
-    order,
-    name: readString(parsed.name),
-    sceneKey: SCENE_KEY,
-    payload: {
-      format: PLACEMENT_FORMAT,
-      balls,
-      ballCount: Math.trunc(ballCount),
-      rotationSpeed: readNumber(parsed.payload.rotationSpeed, 0),
-      boosters: parseBoosters(parsed.payload.boosters),
-      seed,
+    lattice,
+    document: {
+      id: shared.id,
+      order: shared.order,
+      name: shared.name,
+      sceneKey: SCENE_KEY,
+      payload: {
+        format: PLACEMENT_FORMAT,
+        balls,
+        ballCount: shared.ballCount,
+        rotationSpeed: shared.rotationSpeed,
+        boosters: shared.boosters,
+        seed: shared.seed,
+      },
     },
   };
 }
@@ -140,7 +192,7 @@ export function serializeStickyLevel(document: StickyLevelDocument): string {
       name: document.name,
       sceneKey: document.sceneKey,
       payload: {
-        format: document.payload.format,
+        format: PLACEMENT_FORMAT,
         balls: document.payload.balls.map((ball) => ({
           position: {
             x: ball.position.x,
@@ -158,4 +210,14 @@ export function serializeStickyLevel(document: StickyLevelDocument): string {
     null,
     2,
   )}\n`;
+}
+
+export function serializeExportedLevel(
+  document: StickyLevelDocument,
+  lattice: LatticeSpec | null,
+): string {
+  if (canEncodeAsCylindricalGrid(document.payload.balls, lattice)) {
+    return serializeStickyGrid(document, lattice);
+  }
+  return serializeStickyLevel(document);
 }

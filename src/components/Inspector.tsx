@@ -1,9 +1,10 @@
 "use client";
 
+import { canEncodeAsCylindricalGrid } from "@/lib/generators/cylindricalGrid";
+import { authoringTools } from "@/lib/generators/tools";
 import { STICKY_COLOR_CODES, STICKY_COLOR_HEX, STICKY_COLOR_LABELS } from "@/lib/sticky/colors";
 import { BALL_DIAMETER } from "@/lib/sticky/constants";
-import { findInvalidBallIds, minCenterDistanceFor } from "@/lib/sticky/validateSpacing";
-import { authoringTools } from "@/lib/generators/tools";
+import { findInvalidBallIds, minCenterDistanceFor, minLayerCenterDistanceFor } from "@/lib/sticky/validateSpacing";
 import { useEditorStore } from "@/state/editorStore";
 import { useMemo, useRef, useState } from "react";
 
@@ -29,6 +30,7 @@ export function Inspector() {
   const clearBalls = useEditorStore((state) => state.clearBalls);
   const spacingTolerance = useEditorStore((state) => state.spacingTolerance);
   const setSpacingTolerance = useEditorStore((state) => state.setSpacingTolerance);
+  const lattice = useEditorStore((state) => state.lattice);
 
   const selectedBalls = useMemo(() => {
     const selected = new Set(selectedIds);
@@ -41,7 +43,9 @@ export function Inspector() {
     [document.payload.balls, spacingTolerance],
   );
   const spacingValid = invalidIds.size === 0;
+  const exportFormat = canEncodeAsCylindricalGrid(document.payload.balls, lattice) ? "grid" : "placements";
   const minDistance = minCenterDistanceFor(spacingTolerance);
+  const layerMinDistance = minLayerCenterDistanceFor(spacingTolerance);
   const commonSelectedColor =
     selectedBalls.length > 0 && selectedBalls.every((ball) => ball.color === selectedBalls[0].color)
       ? selectedBalls[0].color
@@ -109,8 +113,9 @@ export function Inspector() {
       <header className="inspector-header">
         <h1>Sticky Authoring</h1>
         <p>
-          Placements JSON · diameter {BALL_DIAMETER.toFixed(2)} · min distance{" "}
+          Export format {exportFormat} · diameter {BALL_DIAMETER.toFixed(2)} · min distance{" "}
           {minDistance.toFixed(3)}
+          {lattice ? ` · shells ${layerMinDistance.toFixed(3)}` : ""}
         </p>
       </header>
 
@@ -153,7 +158,9 @@ export function Inspector() {
         {!spacingValid ? (
           <p className="error">
             {invalidIds.size} ball{invalidIds.size === 1 ? "" : "s"} closer than{" "}
-            {minDistance.toFixed(3)}. Export is disabled.
+            {minDistance.toFixed(3)}
+            {lattice ? ` (${layerMinDistance.toFixed(3)} across shells)` : ""}. Export is
+            disabled.
           </p>
         ) : (
           <p className="ok">Spacing valid</p>

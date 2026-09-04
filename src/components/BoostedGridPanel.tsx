@@ -1,12 +1,12 @@
 "use client";
 
 import { generateBoostedGrid } from "@/lib/generators/boostedGrid";
-import { innerColumnsFor, MAX_LAYERS } from "@/lib/generators/cylindricalLattice";
+import { enumerateLatticeSlots, innerColumnsFor, MAX_LAYERS, normalizeLattice } from "@/lib/generators/cylindricalLattice";
 import type { StickyColorCode } from "@/lib/sticky/colors";
-import { useEditorStore } from "@/state/editorStore";
+import { BOOSTED_GRID_SESSION, useEditorStore } from "@/state/editorStore";
 import { useEffect, useRef, useState } from "react";
 
-const SESSION = "boosted-grid";
+const DEFAULT_DRAFT = { columns: 8, rows: 6, layers: 1 };
 
 function colorsBySlotFromBalls(balls: { id: string; color: StickyColorCode }[]): Record<string, StickyColorCode> {
   const colors: Record<string, StickyColorCode> = {};
@@ -21,56 +21,80 @@ function colorsBySlotFromBalls(balls: { id: string; color: StickyColorCode }[]):
 export function BoostedGridPanel() {
   const balls = useEditorStore((state) => state.document.payload.balls);
   const generatorSession = useEditorStore((state) => state.generatorSession);
+  const lattice = useEditorStore((state) => state.lattice);
   const beginGeneratorSession = useEditorStore((state) => state.beginGeneratorSession);
   const rebuildGeneratedBalls = useEditorStore((state) => state.rebuildGeneratedBalls);
+  const setLattice = useEditorStore((state) => state.setLattice);
 
-  const [columns, setColumns] = useState(8);
-  const [rows, setRows] = useState(6);
-  const [layers, setLayers] = useState(1);
-  const live = generatorSession === SESSION;
+  const [draft, setDraft] = useState(DEFAULT_DRAFT);
+  const live = generatorSession === BOOSTED_GRID_SESSION && lattice !== null;
   const skipLive = useRef(true);
+  const previousLattice = useRef(lattice);
 
+  const columns = lattice?.columns ?? draft.columns;
+  const rows = lattice?.rows ?? draft.rows;
+  const layers = lattice?.layers ?? draft.layers;
   const innerMissing = layers > 1 && innerColumnsFor(Math.max(3, Math.trunc(columns)), 1) === null;
+  const innerWidths = Array.from({ length: Math.max(0, layers - 1) }, (_, index) =>
+    innerColumnsFor(Math.max(3, Math.trunc(columns)), index + 1),
+  );
+
+  function commitParams(next: { columns: number; rows: number; layers: number }) {
+    const normalized = normalizeLattice(next);
+    if (lattice) {
+      setLattice(normalized);
+      return;
+    }
+    setDraft(normalized);
+  }
 
   function onGenerate() {
+    const spec = normalizeLattice({ columns, rows, layers });
     const next = generateBoostedGrid({
-      columns,
-      rows,
-      layers,
+      ...spec,
       colorsBySlot: colorsBySlotFromBalls(balls),
     });
     if (live) {
-      rebuildGeneratedBalls(next);
+      previousLattice.current = spec;
+      rebuildGeneratedBalls(next, spec);
       return;
     }
-    beginGeneratorSession(SESSION, next);
+    beginGeneratorSession(BOOSTED_GRID_SESSION, next, spec);
   }
 
   useEffect(() => {
-    if (!live) {
+    if (!live || !lattice) {
       skipLive.current = true;
+      previousLattice.current = lattice;
       return;
     }
     if (skipLive.current) {
       skipLive.current = false;
+      previousLattice.current = lattice;
+      return;
+    }
+    const previous = previousLattice.current ?? lattice;
+    const current = useEditorStore.getState().lattice;
+    if (!current) {
       return;
     }
     rebuildGeneratedBalls(
       generateBoostedGrid({
-        columns,
-        rows,
-        layers,
+        ...current,
         colorsBySlot: colorsBySlotFromBalls(useEditorStore.getState().document.payload.balls),
+        previousSlots: enumerateLatticeSlots(previous),
       }),
     );
-  }, [columns, rows, layers, live, rebuildGeneratedBalls]);
+    previousLattice.current = current;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- lattice object identity must not retrigger rebuild
+  }, [lattice?.columns, lattice?.rows, lattice?.layers, live, rebuildGeneratedBalls]);
 
   return (
     <section className="panel">
       <h2>Boosted grid</h2>
       <p className="muted">
         Cylindrical lattice (Unity Boosted). Generate once, then columns / rows / layers update live and keep slot
-        colors.
+        colors. Export uses format &quot;grid&quot;.
       </p>
       <label>
         Columns
@@ -79,7 +103,7 @@ export function BoostedGridPanel() {
           min={3}
           step={1}
           value={columns}
-          onChange={(event) => setColumns(Number(event.target.value))}
+          onChange={(event) => commitParams({ columns: Number(event.target.value), rows, layers })}
         />
       </label>
       <label>
@@ -89,7 +113,7 @@ export function BoostedGridPanel() {
           min={1}
           step={1}
           value={rows}
-          onChange={(event) => setRows(Number(event.target.value))}
+          onChange={(event) => commitParams({ columns, rows: Number(event.target.value), layers })}
         />
       </label>
       <label>
@@ -100,9 +124,17 @@ export function BoostedGridPanel() {
           max={MAX_LAYERS}
           step={1}
           value={layers}
-          onChange={(event) => setLayers(Number(event.target.value))}
+          onChange={(event) => commitParams({ columns, rows, layers: Number(event.target.value) })}
         />
       </label>
+      {layers > 1 ? (
+        <p className="muted">
+          Inner widths:{" "}
+          {innerWidths
+            .map((width, index) => `L${index + 1}=${width ?? "skipped"}`)
+            .join(", ")}
+        </p>
+      ) : null}
       {innerMissing ? (
         <p className="muted">
           Inner layers need a wider outer ring. Layer 1 is skipped until columns is large enough (try 12+).

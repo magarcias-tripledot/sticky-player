@@ -62,4 +62,19 @@ describe("generateBoostedGrid", () => {
     expect(grown.find((ball) => ball.id === slotId(0, 0, 0))?.color).toBe("B");
     expect(grown.find((ball) => ball.id === slotId(0, 0, 6))?.color).toBe("R");
   });
+
+  it("keeps holes when previousSlots is provided and fills brand-new ids", () => {
+    const previous = generateBoostedGrid({ columns: 6, rows: 1, layers: 1 }).map((ball) => ball.id as string);
+    const sparse = generateBoostedGrid({
+      columns: 8,
+      rows: 1,
+      layers: 1,
+      colorsBySlot: { [slotId(0, 0, 0)]: "B" },
+      previousSlots: previous,
+    });
+    expect(sparse.find((ball) => ball.id === slotId(0, 0, 0))?.color).toBe("B");
+    expect(sparse.find((ball) => ball.id === slotId(0, 0, 1))).toBeUndefined();
+    expect(sparse.find((ball) => ball.id === slotId(0, 0, 6))?.color).toBe("R");
+    expect(sparse.find((ball) => ball.id === slotId(0, 0, 7))?.color).toBe("R");
+  });
 });

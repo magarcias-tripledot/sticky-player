@@ -16,4 +16,6 @@ export const MIN_CENTER_DISTANCE = BALL_DIAMETER + SPACING_TOLERANCE - OVERLAP_E
 
 export const SCENE_KEY = "Sticky";
 export const PLACEMENT_FORMAT = "placements";
+export const GRID_FORMAT = "grid";
+export const GRID_EMPTY_CELL = ".";
 export const MAX_BOOSTER_CHARGE = 100;
