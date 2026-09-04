@@ -3,6 +3,8 @@ import { BALL_DIAMETER, SPACING_TOLERANCE } from "./constants";
 import { createEmptyDocument } from "./types";
 import overlapping from "./fixtures/overlapping.json";
 import { useEditorStore } from "@/state/editorStore";
+import { generateBoostedGrid } from "@/lib/generators/boostedGrid";
+import { slotId } from "@/lib/generators/cylindricalLattice";
 
 const validJson = `{
   "id": "ok",
@@ -51,6 +53,7 @@ describe("editorStore", () => {
       spacingTolerance: SPACING_TOLERANCE,
       past: [],
       future: [],
+      generatorSession: null,
     });
   });
 
@@ -209,5 +212,46 @@ describe("editorStore", () => {
     });
     useEditorStore.getState().clearBalls();
     expect(useEditorStore.getState().past).toHaveLength(0);
+  });
+
+  it("starts a generator session with one undo snapshot and rebuilds without growing history", () => {
+    const first = generateBoostedGrid({ columns: 6, rows: 1, layers: 1 });
+    useEditorStore.getState().beginGeneratorSession("boosted-grid", first);
+    expect(useEditorStore.getState().past).toHaveLength(1);
+    expect(useEditorStore.getState().generatorSession).toBe("boosted-grid");
+    const painted = first.map((ball) =>
+      ball.id === slotId(0, 0, 0) ? { ...ball, color: "B" as const } : ball,
+    );
+    useEditorStore.getState().rebuildGeneratedBalls(
+      generateBoostedGrid({
+        columns: 8,
+        rows: 1,
+        layers: 1,
+        colorsBySlot: Object.fromEntries(painted.map((ball) => [ball.id as string, ball.color])),
+      }),
+    );
+    expect(useEditorStore.getState().past).toHaveLength(1);
+    const balls = useEditorStore.getState().document.payload.balls;
+    expect(balls).toHaveLength(8);
+    expect(balls.find((ball) => ball.id === slotId(0, 0, 0))?.color).toBe("B");
+    expect(balls.find((ball) => ball.id === slotId(0, 0, 6))?.color).toBe("R");
+  });
+
+  it("undoes a color change after a live rebuild as a single step", () => {
+    useEditorStore.getState().beginGeneratorSession(
+      "boosted-grid",
+      generateBoostedGrid({ columns: 6, rows: 1, layers: 1 }),
+    );
+    useEditorStore.getState().rebuildGeneratedBalls(generateBoostedGrid({ columns: 8, rows: 1, layers: 1 }));
+    useEditorStore.getState().selectBall(slotId(0, 0, 0), false);
+    useEditorStore.getState().setSelectedBallsColor("C");
+    expect(useEditorStore.getState().document.payload.balls.find((ball) => ball.id === slotId(0, 0, 0))?.color).toBe(
+      "C",
+    );
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().document.payload.balls.find((ball) => ball.id === slotId(0, 0, 0))?.color).toBe(
+      "R",
+    );
+    expect(useEditorStore.getState().document.payload.balls).toHaveLength(8);
   });
 });

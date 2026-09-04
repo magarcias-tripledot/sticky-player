@@ -41,6 +41,9 @@ type EditorState = {
   deleteSelectedBalls: () => void;
   updateMetadata: (patch: MetadataPatch) => void;
   applyGeneratedBalls: (generated: GeneratedBall[], mode?: "replace" | "append") => void;
+  generatorSession: string | null;
+  beginGeneratorSession: (session: string, generated: GeneratedBall[]) => void;
+  rebuildGeneratedBalls: (generated: GeneratedBall[]) => void;
   newLevel: () => void;
   clearBalls: () => void;
   undo: () => void;
@@ -79,6 +82,14 @@ function createBallId(): string {
   return crypto.randomUUID();
 }
 
+function mapGeneratedBalls(generated: GeneratedBall[]) {
+  return generated.map((ball) => ({
+    id: ball.id ?? createBallId(),
+    position: { ...ball.position },
+    color: ball.color,
+  }));
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   document: createEmptyDocument(),
   selectedIds: [],
@@ -87,6 +98,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   spacingTolerance: SPACING_TOLERANCE,
   past: [],
   future: [],
+  generatorSession: null,
 
   importJson: (json) => {
     try {
@@ -98,6 +110,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         past: [],
         future: [],
         cameraFitNonce: get().cameraFitNonce + 1,
+        generatorSession: null,
       });
     } catch (error) {
       const message = error instanceof StickyLevelError ? error.message : "Level JSON is invalid.";
@@ -179,16 +192,35 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   applyGeneratedBalls: (generated, mode = "replace") => {
     const nextDocument = cloneDocument(get().document);
-    const mapped = generated.map((ball) => ({
-      id: createBallId(),
-      position: { ...ball.position },
-      color: ball.color,
-    }));
+    const mapped = mapGeneratedBalls(generated);
     nextDocument.payload.balls = mode === "append" ? [...nextDocument.payload.balls, ...mapped] : mapped;
     set((state) => ({
       ...withHistory(state, nextDocument),
       selectedIds: [],
       cameraFitNonce: state.cameraFitNonce + 1,
+    }));
+  },
+
+  beginGeneratorSession: (session, generated) => {
+    const nextDocument = cloneDocument(get().document);
+    nextDocument.payload.balls = mapGeneratedBalls(generated);
+    set((state) => ({
+      ...withHistory(state, nextDocument),
+      selectedIds: [],
+      cameraFitNonce: state.cameraFitNonce + 1,
+      generatorSession: session,
+    }));
+  },
+
+  rebuildGeneratedBalls: (generated) => {
+    const nextDocument = cloneDocument(get().document);
+    const mapped = mapGeneratedBalls(generated);
+    const nextIds = new Set(mapped.map((ball) => ball.id));
+    nextDocument.payload.balls = mapped;
+    set((state) => ({
+      document: nextDocument,
+      selectedIds: state.selectedIds.filter((id) => nextIds.has(id)),
+      importError: null,
     }));
   },
 
@@ -200,6 +232,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       past: [],
       future: [],
       cameraFitNonce: get().cameraFitNonce + 1,
+      generatorSession: null,
     });
   },
 
@@ -215,6 +248,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ...withHistory(state, nextDocument),
       selectedIds: [],
       cameraFitNonce: state.cameraFitNonce + 1,
+      generatorSession: null,
     }));
   },
 

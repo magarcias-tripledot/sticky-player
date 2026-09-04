@@ -3,8 +3,9 @@
 import { STICKY_COLOR_CODES, STICKY_COLOR_HEX, STICKY_COLOR_LABELS } from "@/lib/sticky/colors";
 import { BALL_DIAMETER } from "@/lib/sticky/constants";
 import { findInvalidBallIds, minCenterDistanceFor } from "@/lib/sticky/validateSpacing";
+import { authoringTools } from "@/lib/generators/tools";
 import { useEditorStore } from "@/state/editorStore";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 
 function formatCoord(value: number): string {
   return value.toFixed(3);
@@ -45,6 +46,9 @@ export function Inspector() {
     selectedBalls.length > 0 && selectedBalls.every((ball) => ball.color === selectedBalls[0].color)
       ? selectedBalls[0].color
       : null;
+
+  const [toolId, setToolId] = useState(authoringTools[0]?.id ?? "");
+  const ActiveToolPanel = authoringTools.find((tool) => tool.id === toolId)?.Panel;
 
   function onImportFile(file: File | undefined) {
     if (!file) {
@@ -169,6 +173,23 @@ export function Inspector() {
           this for an extra authoring margin, like Unity&apos;s Spacing Tolerance.
         </p>
       </section>
+
+      <section className="panel">
+        <h2>Tools</h2>
+        <div className="row">
+          {authoringTools.map((tool) => (
+            <button
+              key={tool.id}
+              type="button"
+              className={tool.id === toolId ? "tool-tab selected" : "tool-tab"}
+              onClick={() => setToolId(tool.id)}
+            >
+              {tool.label}
+            </button>
+          ))}
+        </div>
+      </section>
+      {ActiveToolPanel ? <ActiveToolPanel /> : null}
 
       <section className="panel">
         <h2>Counts</h2>
