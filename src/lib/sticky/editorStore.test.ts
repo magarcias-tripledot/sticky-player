@@ -45,7 +45,7 @@ describe("editorStore", () => {
   beforeEach(() => {
     useEditorStore.setState({
       document: createEmptyDocument(),
-      selectedId: null,
+      selectedIds: [],
       importError: null,
       cameraFitNonce: 0,
       spacingTolerance: SPACING_TOLERANCE,
@@ -87,13 +87,15 @@ describe("editorStore", () => {
   it("undoes color changes and deletions", () => {
     useEditorStore.getState().importJson(validJson);
     const firstId = useEditorStore.getState().document.payload.balls[0].id;
-    useEditorStore.getState().setBallColor(firstId, "C");
+    useEditorStore.getState().selectBall(firstId, false);
+    useEditorStore.getState().setSelectedBallsColor("C");
     expect(useEditorStore.getState().document.payload.balls[0].color).toBe("C");
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().document.payload.balls[0].color).toBe("R");
     useEditorStore.getState().redo();
     expect(useEditorStore.getState().document.payload.balls[0].color).toBe("C");
-    useEditorStore.getState().deleteBall(firstId);
+    useEditorStore.getState().selectBall(firstId, false);
+    useEditorStore.getState().deleteSelectedBalls();
     expect(useEditorStore.getState().document.payload.balls).toHaveLength(1);
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().document.payload.balls).toHaveLength(2);
@@ -101,9 +103,10 @@ describe("editorStore", () => {
 
   it("newLevel restores default id/name, empty balls, and wipes undo", () => {
     useEditorStore.getState().importJson(validJson);
-    useEditorStore.getState().setBallColor(useEditorStore.getState().document.payload.balls[0].id, "C");
+    useEditorStore.getState().selectBall(useEditorStore.getState().document.payload.balls[0].id, false);
+    useEditorStore.getState().setSelectedBallsColor("C");
     useEditorStore.getState().newLevel();
-    const { document, past, future, selectedId } = useEditorStore.getState();
+    const { document, past, future, selectedIds } = useEditorStore.getState();
     expect(document.id).toBe("untitled-level");
     expect(document.name).toBe("Untitled Level");
     expect(document.payload.balls).toHaveLength(0);
@@ -117,7 +120,44 @@ describe("editorStore", () => {
     });
     expect(past).toHaveLength(0);
     expect(future).toHaveLength(0);
-    expect(selectedId).toBeNull();
+    expect(selectedIds).toEqual([]);
+  });
+
+  it("toggles balls into and out of a multi-selection", () => {
+    useEditorStore.getState().importJson(validJson);
+    const [first, second] = useEditorStore.getState().document.payload.balls;
+    useEditorStore.getState().selectBall(first.id, false);
+    useEditorStore.getState().selectBall(second.id, true);
+    expect(useEditorStore.getState().selectedIds).toEqual([first.id, second.id]);
+    useEditorStore.getState().selectBall(first.id, true);
+    expect(useEditorStore.getState().selectedIds).toEqual([second.id]);
+    useEditorStore.getState().clearSelection();
+    expect(useEditorStore.getState().selectedIds).toEqual([]);
+  });
+
+  it("colors multiple selected balls as one undo step", () => {
+    useEditorStore.getState().importJson(validJson);
+    const [first, second] = useEditorStore.getState().document.payload.balls;
+    useEditorStore.getState().selectBall(first.id, false);
+    useEditorStore.getState().selectBall(second.id, true);
+    useEditorStore.getState().setSelectedBallsColor("C");
+    expect(useEditorStore.getState().document.payload.balls.map((ball) => ball.color)).toEqual(["C", "C"]);
+    expect(useEditorStore.getState().past).toHaveLength(1);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().document.payload.balls.map((ball) => ball.color)).toEqual(["R", "B"]);
+  });
+
+  it("deletes multiple selected balls as one undo step", () => {
+    useEditorStore.getState().importJson(validJson);
+    const [first, second] = useEditorStore.getState().document.payload.balls;
+    useEditorStore.getState().selectBall(first.id, false);
+    useEditorStore.getState().selectBall(second.id, true);
+    useEditorStore.getState().deleteSelectedBalls();
+    expect(useEditorStore.getState().document.payload.balls).toHaveLength(0);
+    expect(useEditorStore.getState().past).toHaveLength(1);
+    expect(useEditorStore.getState().selectedIds).toEqual([]);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().document.payload.balls).toHaveLength(2);
   });
 
   it("clearBalls empties balls, zeros ballCount, and keeps identity metadata", () => {

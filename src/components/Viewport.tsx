@@ -22,7 +22,7 @@ function BallMesh({
   selected: boolean;
   invalid: boolean;
 }) {
-  const setSelectedId = useEditorStore((state) => state.setSelectedId);
+  const selectBall = useEditorStore((state) => state.selectBall);
 
   return (
     <mesh
@@ -30,7 +30,7 @@ function BallMesh({
       scale={selected ? 1.06 : 1}
       onClick={(event) => {
         event.stopPropagation();
-        setSelectedId(id);
+        selectBall(id, event.shiftKey || event.metaKey || event.ctrlKey);
       }}
     >
       <sphereGeometry args={[BALL_RADIUS, 32, 32]} />
@@ -87,13 +87,14 @@ function FitCamera({ nonce }: { nonce: number }) {
 
 function SceneContents() {
   const balls = useEditorStore((state) => state.document.payload.balls);
-  const selectedId = useEditorStore((state) => state.selectedId);
+  const selectedIds = useEditorStore((state) => state.selectedIds);
   const cameraFitNonce = useEditorStore((state) => state.cameraFitNonce);
   const spacingTolerance = useEditorStore((state) => state.spacingTolerance);
   const invalidIds = useMemo(
     () => findInvalidBallIds(balls, spacingTolerance),
     [balls, spacingTolerance],
   );
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
   return (
     <>
@@ -116,7 +117,7 @@ function SceneContents() {
           id={ball.id}
           position={[ball.position.x, ball.position.y, ball.position.z]}
           color={STICKY_COLOR_HEX[ball.color]}
-          selected={ball.id === selectedId}
+          selected={selectedSet.has(ball.id)}
           invalid={invalidIds.has(ball.id)}
         />
       ))}
@@ -127,13 +128,13 @@ function SceneContents() {
 }
 
 export function Viewport() {
-  const setSelectedId = useEditorStore((state) => state.setSelectedId);
+  const clearSelection = useEditorStore((state) => state.clearSelection);
 
   return (
     <Canvas
       className="viewport-canvas"
       camera={{ position: [2.6, 2, 3.4], fov: 50, near: 0.05 }}
-      onPointerMissed={() => setSelectedId(null)}
+      onPointerMissed={clearSelection}
     >
       <color attach="background" args={["#12141a"]} />
       <SceneContents />

@@ -3,7 +3,7 @@
 import { STICKY_COLOR_CODES, STICKY_COLOR_HEX, STICKY_COLOR_LABELS } from "@/lib/sticky/colors";
 import { BALL_DIAMETER } from "@/lib/sticky/constants";
 import { findInvalidBallIds, minCenterDistanceFor } from "@/lib/sticky/validateSpacing";
-import { selectSelectedBall, useEditorStore } from "@/state/editorStore";
+import { useEditorStore } from "@/state/editorStore";
 import { useMemo, useRef } from "react";
 
 function formatCoord(value: number): string {
@@ -13,13 +13,13 @@ function formatCoord(value: number): string {
 export function Inspector() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const document = useEditorStore((state) => state.document);
-  const selectedBall = useEditorStore(selectSelectedBall);
+  const selectedIds = useEditorStore((state) => state.selectedIds);
   const importError = useEditorStore((state) => state.importError);
   const pastLength = useEditorStore((state) => state.past.length);
   const futureLength = useEditorStore((state) => state.future.length);
   const importJson = useEditorStore((state) => state.importJson);
-  const setBallColor = useEditorStore((state) => state.setBallColor);
-  const deleteBall = useEditorStore((state) => state.deleteBall);
+  const setSelectedBallsColor = useEditorStore((state) => state.setSelectedBallsColor);
+  const deleteSelectedBalls = useEditorStore((state) => state.deleteSelectedBalls);
   const updateMetadata = useEditorStore((state) => state.updateMetadata);
   const undo = useEditorStore((state) => state.undo);
   const redo = useEditorStore((state) => state.redo);
@@ -29,12 +29,22 @@ export function Inspector() {
   const spacingTolerance = useEditorStore((state) => state.spacingTolerance);
   const setSpacingTolerance = useEditorStore((state) => state.setSpacingTolerance);
 
+  const selectedBalls = useMemo(() => {
+    const selected = new Set(selectedIds);
+    return document.payload.balls.filter((ball) => selected.has(ball.id));
+  }, [document.payload.balls, selectedIds]);
+  const selectedBall = selectedBalls.length === 1 ? selectedBalls[0] : null;
+
   const invalidIds = useMemo(
     () => findInvalidBallIds(document.payload.balls, spacingTolerance),
     [document.payload.balls, spacingTolerance],
   );
   const spacingValid = invalidIds.size === 0;
   const minDistance = minCenterDistanceFor(spacingTolerance);
+  const commonSelectedColor =
+    selectedBalls.length > 0 && selectedBalls.every((ball) => ball.color === selectedBalls[0].color)
+      ? selectedBalls[0].color
+      : null;
 
   function onImportFile(file: File | undefined) {
     if (!file) {
@@ -178,34 +188,38 @@ export function Inspector() {
       </section>
 
       <section className="panel">
-        <h2>Selected ball</h2>
-        {selectedBall ? (
+        <h2>{selectedBalls.length === 1 ? "Selected ball" : "Selected balls"}</h2>
+        {selectedBalls.length > 0 ? (
           <>
-            <div className="xyz">
-              <span>X {formatCoord(selectedBall.position.x)}</span>
-              <span>Y {formatCoord(selectedBall.position.y)}</span>
-              <span>Z {formatCoord(selectedBall.position.z)}</span>
-            </div>
+            {selectedBall ? (
+              <div className="xyz">
+                <span>X {formatCoord(selectedBall.position.x)}</span>
+                <span>Y {formatCoord(selectedBall.position.y)}</span>
+                <span>Z {formatCoord(selectedBall.position.z)}</span>
+              </div>
+            ) : (
+              <p className="muted">{selectedBalls.length} balls selected</p>
+            )}
             <div className="swatches">
               {STICKY_COLOR_CODES.map((code) => (
                 <button
                   key={code}
                   type="button"
-                  className={selectedBall.color === code ? "swatch selected" : "swatch"}
+                  className={commonSelectedColor === code ? "swatch selected" : "swatch"}
                   style={{ background: STICKY_COLOR_HEX[code] }}
                   title={STICKY_COLOR_LABELS[code]}
-                  onClick={() => setBallColor(selectedBall.id, code)}
+                  onClick={() => setSelectedBallsColor(code)}
                 >
                   {code}
                 </button>
               ))}
             </div>
-            <button type="button" className="danger" onClick={() => deleteBall(selectedBall.id)}>
-              Delete ball
+            <button type="button" className="danger" onClick={deleteSelectedBalls}>
+              Delete {selectedBalls.length === 1 ? "ball" : `${selectedBalls.length} balls`}
             </button>
           </>
         ) : (
-          <p className="muted">Click a sphere to select it.</p>
+          <p className="muted">Click a sphere to select it. Shift, Cmd, or Ctrl-click to select multiple.</p>
         )}
       </section>
 

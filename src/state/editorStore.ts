@@ -26,7 +26,7 @@ type MetadataPatch = {
 
 type EditorState = {
   document: StickyLevelDocument;
-  selectedId: string | null;
+  selectedIds: string[];
   importError: string | null;
   cameraFitNonce: number;
   // Authoring-only setting, like StickyLevelAuthoring._spacingTolerance. Never exported.
@@ -34,10 +34,11 @@ type EditorState = {
   past: Snapshot[];
   future: Snapshot[];
   importJson: (json: string) => void;
-  setSelectedId: (id: string | null) => void;
+  selectBall: (id: string, toggle: boolean) => void;
+  clearSelection: () => void;
   setSpacingTolerance: (tolerance: number) => void;
-  setBallColor: (id: string, color: StickyColorCode) => void;
-  deleteBall: (id: string) => void;
+  setSelectedBallsColor: (color: StickyColorCode) => void;
+  deleteSelectedBalls: () => void;
   updateMetadata: (patch: MetadataPatch) => void;
   applyGeneratedBalls: (generated: GeneratedBall[], mode?: "replace" | "append") => void;
   newLevel: () => void;
@@ -80,7 +81,7 @@ function createBallId(): string {
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   document: createEmptyDocument(),
-  selectedId: null,
+  selectedIds: [],
   importError: null,
   cameraFitNonce: 0,
   spacingTolerance: SPACING_TOLERANCE,
@@ -92,7 +93,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const document = parseStickyLevel(json);
       set({
         document,
-        selectedId: null,
+        selectedIds: [],
         importError: null,
         past: [],
         future: [],
@@ -104,36 +105,56 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
-  setSelectedId: (id) => set({ selectedId: id }),
+  selectBall: (id, toggle) => {
+    const { document, selectedIds } = get();
+    if (!document.payload.balls.some((ball) => ball.id === id)) {
+      return;
+    }
+    if (!toggle) {
+      set({ selectedIds: [id] });
+      return;
+    }
+    set({
+      selectedIds: selectedIds.includes(id)
+        ? selectedIds.filter((selectedId) => selectedId !== id)
+        : [...selectedIds, id],
+    });
+  },
+
+  clearSelection: () => set({ selectedIds: [] }),
 
   setSpacingTolerance: (tolerance) => {
     const safe = Number.isFinite(tolerance) ? Math.max(0, tolerance) : 0;
     set({ spacingTolerance: safe });
   },
 
-  setBallColor: (id, color) => {
-    const { document } = get();
-    const exists = document.payload.balls.some((ball) => ball.id === id);
-    if (!exists) {
+  setSelectedBallsColor: (color) => {
+    const { document, selectedIds } = get();
+    const selected = new Set(selectedIds);
+    if (
+      selected.size === 0 ||
+      !document.payload.balls.some((ball) => selected.has(ball.id) && ball.color !== color)
+    ) {
       return;
     }
     const nextDocument = cloneDocument(document);
     nextDocument.payload.balls = nextDocument.payload.balls.map((ball) =>
-      ball.id === id ? { ...ball, color } : ball,
+      selected.has(ball.id) ? { ...ball, color } : ball,
     );
     set((state) => withHistory(state, nextDocument));
   },
 
-  deleteBall: (id) => {
-    const { document, selectedId } = get();
-    if (!document.payload.balls.some((ball) => ball.id === id)) {
+  deleteSelectedBalls: () => {
+    const { document, selectedIds } = get();
+    const selected = new Set(selectedIds);
+    if (selected.size === 0 || !document.payload.balls.some((ball) => selected.has(ball.id))) {
       return;
     }
     const nextDocument = cloneDocument(document);
-    nextDocument.payload.balls = nextDocument.payload.balls.filter((ball) => ball.id !== id);
+    nextDocument.payload.balls = nextDocument.payload.balls.filter((ball) => !selected.has(ball.id));
     set((state) => ({
       ...withHistory(state, nextDocument),
-      selectedId: selectedId === id ? null : selectedId,
+      selectedIds: [],
     }));
   },
 
@@ -166,7 +187,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     nextDocument.payload.balls = mode === "append" ? [...nextDocument.payload.balls, ...mapped] : mapped;
     set((state) => ({
       ...withHistory(state, nextDocument),
-      selectedId: null,
+      selectedIds: [],
       cameraFitNonce: state.cameraFitNonce + 1,
     }));
   },
@@ -174,7 +195,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   newLevel: () => {
     set({
       document: createEmptyDocument(),
-      selectedId: null,
+      selectedIds: [],
       importError: null,
       past: [],
       future: [],
@@ -192,7 +213,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     nextDocument.payload.ballCount = 0;
     set((state) => ({
       ...withHistory(state, nextDocument),
-      selectedId: null,
+      selectedIds: [],
       cameraFitNonce: state.cameraFitNonce + 1,
     }));
   },
@@ -205,7 +226,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     set({
       document: cloneDocument(previous.document),
-      selectedId: null,
+      selectedIds: [],
       past: past.slice(0, -1),
       future: [snapshotOf(document), ...future],
     });
@@ -219,7 +240,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     set({
       document: cloneDocument(next.document),
-      selectedId: null,
+      selectedIds: [],
       past: [...past, snapshotOf(document)],
       future: future.slice(1),
     });
@@ -233,11 +254,3 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return serializeStickyLevel(document);
   },
 }));
-
-export function selectSelectedBall(state: EditorState) {
-  const { selectedId, document } = state;
-  if (!selectedId) {
-    return null;
-  }
-  return document.payload.balls.find((ball) => ball.id === selectedId) ?? null;
-}
