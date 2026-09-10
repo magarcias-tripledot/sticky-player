@@ -50,6 +50,7 @@ There is no physics, snapping, or continuous collision in this app.
 | `ringRadius`, `innerColumnsFor`, `cellCenterWorld`, `slotId`, `parseSlotId`, `enumerateLatticeSlots`, `WORLD_SCALE`, `LAYER_MIN_CENTER_DISTANCE`, `MAX_LAYERS` | `cylindricalLattice.ts` | Boosted / Unity lattice |
 | `parseCylindricalGridMaps`, `serializeStickyGrid`, `canEncodeAsCylindricalGrid` | `cylindricalGrid.ts` | Grid JSON I/O |
 | `generateBoostedGrid`, `boostedGridGenerator` | `boostedGrid.ts` | Fill or sparse rebuild |
+| `parseCsvPlacements`, `csvImportGenerator` | `csvImport.ts` | CSV rows → placements (layer ignored) |
 
 `MIN_CENTER_DISTANCE` is the default-tolerance threshold (`diameter − epsilon`), not a separate gameplay constant.
 
@@ -76,5 +77,7 @@ New generators should:
 4. Add an inspector panel that maps UI → typed params → `generate`, then `beginGeneratorSession` / `rebuildGeneratedBalls` or `applyGeneratedBalls`.
 5. Validate with `findInvalidBallIds` if the algorithm can overlap (boosted grid relies on lattice spacing).
 6. Only the Boosted/cylindrical tool should set store `lattice` (grid export). Other generators leave `lattice` null so export stays placements.
+
+CSV import (`csvImport.ts`) is a placements source: headers `x,y,z,color,layer`. The `layer` column is required and discarded. Sample cube: `public/sample-cube.csv` (4×4×4 at diameter spacing).
 
 Do not emit full level JSON from geometry code; the store owns metadata (`ballCount`, boosters, etc.).
