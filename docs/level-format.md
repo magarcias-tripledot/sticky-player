@@ -9,7 +9,7 @@ Source of truth: `src/lib/sticky/schema.ts`, `types.ts`, `constants.ts`, `colors
 | `"placements"` | New Level, imported placement files, non-grid generators | `balls: [{ position, color }]` |
 | `"grid"` | Boosted grid Generate, or imported cylindrical maps | `grid` string rows + optional `inner` |
 
-**Import:** `format === "placements"` → balls parser. Else a `grid` array is required (Unity sculpture files often omit `format`; this editor always writes `"format": "grid"` on grid export).
+**Import:** `format === "placements"` → balls parser. Else a `grid` array is required (Unity sculpture files often omit `format`; this editor always writes `"format": "grid"` on grid export). CSV ball lists (`public/sample-cube.csv`) are an editor-only import path, not a Unity payload format.
 
 ## Placements
 
@@ -83,5 +83,6 @@ Spacing is **not** checked on import.
 
 - `public/sample-level.json` — placements cluster.
 - `public/sample-grid.json` — 12-column outer + 6-column inner with holes.
+- `public/sample-cube.csv` — editor CSV import: 4×4×4 red cube (layer unused).
 - `src/lib/sticky/fixtures/overlapping.json` — overlapping placements (export blocked).
 - `src/lib/sticky/fixtures/grid-hole.json` — 3×2 grid with a `.` hole.

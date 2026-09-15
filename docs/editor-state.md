@@ -44,6 +44,7 @@ Shortcuts in `EditorApp`: Cmd/Ctrl+Z undo, Shift+Z or Cmd/Ctrl+Y redo; ignored w
 
 - **Import placements:** parse balls; `lattice` null; session null; wipe history; fit camera.
 - **Import grid:** expand maps to slot balls; set `lattice`; start `boosted-grid` session; wipe history; fit camera.
+- **Import CSV (Tools):** `parseCsvPlacements` → `applyGeneratedBalls(replace)`; one undo step; clear lattice/session; fit camera. Does not wipe history.
 - **Export:** overlap → `null`. Else if `lattice` is set and every ball id is a slot of that lattice → `"format": "grid"`. Else `"format": "placements"`.
 - **New Level:** factory placements document; `lattice` null; wipe history/session; fit camera.
 - **Clear:** empty `balls`, `ballCount = 0`; keep id/name/boosters. On a lattice-backed level, keep `lattice` (export is an all-`.` grid). On placements, clear session.

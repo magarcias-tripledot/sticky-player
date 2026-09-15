@@ -14,7 +14,7 @@ A Next.js 15 (App Router) static app. Zustand holds the level document. React Th
 JSON file → parseStickyLevel → editorStore.document (+ lattice if grid)
                               → Viewport (R3F spheres)
                               → Inspector (metadata, tools, export)
-generator params → generate*() → GeneratedBall[] → store (replace / session rebuild)
+generator params / CSV → generate*() / parseCsvPlacements → GeneratedBall[] → store (replace / session rebuild)
 exportJson → spacing check → serialize grid or placements → download
 ```
 
@@ -29,11 +29,13 @@ Details: [docs/architecture.md](docs/architecture.md)
 | `src/components/Viewport.tsx` | R3F canvas, pick/select, overlap highlight |
 | `src/components/Inspector.tsx` | Import/export, metadata, tools host |
 | `src/components/BoostedGridPanel.tsx` | Boosted-grid generator UI |
+| `src/components/CsvImportPanel.tsx` | CSV placements import UI |
 | `src/state/editorStore.ts` | Zustand store, history, import/export, lattice |
 | `src/lib/sticky/` | Schema, types, colors, spacing validation |
-| `src/lib/generators/` | Procedural geometry, lattice math, grid maps |
+| `src/lib/generators/` | Procedural geometry, lattice math, grid maps, CSV parse |
 | `public/sample-level.json` | Example placements file |
 | `public/sample-grid.json` | Example cylindrical grid file |
+| `public/sample-cube.csv` | Example CSV cube (4×4×4) |
 
 ## Invariants
 

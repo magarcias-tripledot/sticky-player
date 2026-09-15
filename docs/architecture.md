@@ -22,10 +22,12 @@
 | `src/lib/generators/cylindricalLattice.ts` | Unity-aligned ring/lattice math, slot ids, `LatticeSpec` |
 | `src/lib/generators/cylindricalGrid.ts` | Parse/serialize `grid`/`inner` maps, encode check |
 | `src/lib/generators/boostedGrid.ts` | Fills or sparsely rebuilds lattice cells → `GeneratedBall[]` |
+| `src/lib/generators/csvImport.ts` | Parse CSV ball rows → `GeneratedBall[]` (layer column ignored) |
 | `src/lib/generators/tools.ts` | Inspector tool tabs + generator registry |
 | `Viewport` | Camera, grid, spheres, click selection |
 | `Inspector` | File I/O, metadata, tools host |
 | `BoostedGridPanel` | Columns/rows/layers → store session + live rebuild |
+| `CsvImportPanel` | CSV file → `applyGeneratedBalls` replace (placements) |
 
 There is **no** backend, persistence, or LLM client in this repo.
 
@@ -38,20 +40,24 @@ There is **no** backend, persistence, or LLM client in this repo.
 
 Generator path (boosted grid): panel params → `generateBoostedGrid` → `beginGeneratorSession` (first Generate, one undo snapshot, sets `lattice`) or `rebuildGeneratedBalls` (live param changes, **no** extra undo, occupancy-preserving). Slot ids `slot-{layer}-{row}-{column}`.
 
-`applyGeneratedBalls` is unused by UI. Append onto a lattice level makes export fall back to placements.
+`applyGeneratedBalls` is used by CSV import (`replace`). Append onto a lattice level makes export fall back to placements.
+
+CSV path: Tools → CSV → `parseCsvPlacements` → `applyGeneratedBalls(..., "replace")`. One undo step; clears `lattice` and `generatorSession`; export is placements. Does not wipe history like JSON import.
 
 ## Dependencies
 
 ```
 app → EditorApp → Viewport, Inspector
-Inspector → editorStore, sticky/*, generators/tools, BoostedGridPanel
+Inspector → editorStore, sticky/*, generators/tools, BoostedGridPanel, CsvImportPanel
 BoostedGridPanel → boostedGrid, cylindricalLattice, editorStore
+CsvImportPanel → csvImport, editorStore
 Viewport → editorStore, sticky constants/colors/validateSpacing, R3F/drei/three
 editorStore → schema, types, validateSpacing, generators/types
 schema → cylindricalGrid, colors, constants, types
 validateSpacing → cylindricalLattice (shell pitch, slot parsing), constants, types
 cylindricalGrid → cylindricalLattice, sticky colors/constants/types
 boostedGrid → cylindricalLattice, sticky colors
+csvImport → sticky colors/types
 cylindricalLattice → sticky BALL_RADIUS (world scale only)
 ```
 

@@ -5,6 +5,7 @@ import overlapping from "./fixtures/overlapping.json";
 import gridHole from "./fixtures/grid-hole.json";
 import { useEditorStore } from "@/state/editorStore";
 import { generateBoostedGrid } from "@/lib/generators/boostedGrid";
+import { parseCsvPlacements } from "@/lib/generators/csvImport";
 import { slotId } from "@/lib/generators/cylindricalLattice";
 
 const validJson = `{
@@ -344,5 +345,25 @@ describe("editorStore", () => {
     const parsed = JSON.parse(useEditorStore.getState().exportJson() as string);
     expect(parsed.payload.format).toBe("grid");
     expect(parsed.payload.grid[0]).toBe("...");
+  });
+
+  it("replaces a grid session with CSV placements and exports placements", () => {
+    useEditorStore.getState().beginGeneratorSession(
+      "boosted-grid",
+      generateBoostedGrid({ columns: 3, rows: 1, layers: 1 }),
+      { columns: 3, rows: 1, layers: 1 },
+    );
+    useEditorStore.getState().applyGeneratedBalls(
+      parseCsvPlacements("x,y,z,color,layer\n0,0.3,0,R,0\n0.6,0.3,0,B,1\n"),
+      "replace",
+    );
+    const state = useEditorStore.getState();
+    expect(state.lattice).toBeNull();
+    expect(state.generatorSession).toBeNull();
+    expect(state.document.payload.balls).toHaveLength(2);
+    expect(state.past).toHaveLength(2);
+    const parsed = JSON.parse(state.exportJson() as string);
+    expect(parsed.payload.format).toBe("placements");
+    expect(parsed.payload.balls).toHaveLength(2);
   });
 });
